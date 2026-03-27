@@ -1,0 +1,39 @@
+# OfflineNet Emergency Communication System - Project Requirements
+# Node.js / React Project Dependencies
+
+# Core Framework
+react==18.2.0
+react-dom==18.2.0
+
+# Build Tools
+vite==4.5.14
+@vitejs/plugin-react==4.2.1
+
+# QR Code Generation & Scanning
+qrcode==1.0.0
+jsqr==1.4.0
+
+# Utilities
+uuid==4.0.0
+
+# Development Dependencies
+@babel/core==7.x
+@babel/preset-react==7.x
+eslint==8.x
+prettier==3.x
+
+# Browser APIs (no installation needed - built-in)
+# - Canvas API
+# - MediaDevices API (camera access)
+# - LocalStorage API
+# - FileReader API
+# - Clipboard API
+
+# Note: This is a Node.js/React project. Install dependencies using:
+# npm install
+
+# To run the development server:
+# npm run dev
+
+# To build for production:
+# npm run build

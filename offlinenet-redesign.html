@@ -1,0 +1,1443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>OfflineNet — Emergency Communication Network</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow+Condensed:wght@300;400;600;700&family=Barlow:wght@300;400;500&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #0a0b0c;
+    --bg-panel: #111214;
+    --bg-card: #161819;
+    --bg-input: #0d0e0f;
+    --border: #1e2124;
+    --border-accent: #2e3338;
+    --green: #39d353;
+    --green-dim: #1a6628;
+    --green-glow: rgba(57,211,83,0.08);
+    --amber: #e8a020;
+    --amber-dim: #5c3f0a;
+    --red: #e03c3c;
+    --red-dim: #5a1a1a;
+    --text-primary: #d4d8dc;
+    --text-secondary: #6b7280;
+    --text-dim: #3d4248;
+    --mono: 'Share Tech Mono', monospace;
+    --condensed: 'Barlow Condensed', sans-serif;
+    --body: 'Barlow', sans-serif;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text-primary);
+    font-family: var(--body);
+    font-size: 14px;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* SCANLINE OVERLAY */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(
+      to bottom,
+      transparent 0px,
+      transparent 3px,
+      rgba(0,0,0,0.06) 3px,
+      rgba(0,0,0,0.06) 4px
+    );
+    pointer-events: none;
+    z-index: 9999;
+  }
+
+  /* HEADER */
+  .header {
+    background: var(--bg-panel);
+    border-bottom: 1px solid var(--border);
+    padding: 0 24px;
+    height: 52px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .header-left {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .signal-icon {
+    width: 28px;
+    height: 28px;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .signal-icon::before {
+    content: '';
+    width: 8px;
+    height: 8px;
+    background: var(--green);
+    border-radius: 50%;
+    box-shadow: 0 0 0 3px var(--green-glow), 0 0 12px rgba(57,211,83,0.4);
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { box-shadow: 0 0 0 3px var(--green-glow), 0 0 8px rgba(57,211,83,0.3); }
+    50% { box-shadow: 0 0 0 6px var(--green-glow), 0 0 16px rgba(57,211,83,0.5); }
+  }
+
+  .header-title {
+    font-family: var(--condensed);
+    font-weight: 700;
+    font-size: 18px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-primary);
+  }
+
+  .header-title span {
+    color: var(--green);
+  }
+
+  .header-sub {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-secondary);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    border-left: 1px solid var(--border-accent);
+    padding-left: 16px;
+    margin-left: 4px;
+  }
+
+  .header-status {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+  }
+
+  .status-pill {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+  }
+
+  .status-dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+  }
+
+  .status-dot.online { background: var(--green); }
+  .status-dot.warning { background: var(--amber); }
+
+  /* NAV */
+  .nav {
+    background: var(--bg-panel);
+    border-bottom: 1px solid var(--border);
+    padding: 0 24px;
+    display: flex;
+    gap: 0;
+  }
+
+  .nav-tab {
+    padding: 12px 20px;
+    font-family: var(--condensed);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+    cursor: pointer;
+    border: none;
+    background: none;
+    border-bottom: 2px solid transparent;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    position: relative;
+  }
+
+  .nav-tab:hover { color: var(--text-primary); }
+
+  .nav-tab.active {
+    color: var(--green);
+    border-bottom-color: var(--green);
+  }
+
+  .nav-tab .tab-icon {
+    width: 14px;
+    height: 14px;
+    opacity: 0.7;
+  }
+
+  .nav-tab.active .tab-icon { opacity: 1; }
+
+  /* LAYOUT */
+  .layout {
+    display: grid;
+    grid-template-columns: 1fr 320px;
+    gap: 0;
+    min-height: calc(100vh - 104px);
+  }
+
+  .main { padding: 24px; border-right: 1px solid var(--border); }
+  .sidebar { padding: 24px; background: var(--bg-panel); }
+
+  /* SECTION LABEL */
+  .section-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+    border-left: 2px solid var(--green);
+    padding-left: 10px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  /* FORM CARD */
+  .form-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    padding: 24px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .form-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, var(--green) 0%, transparent 60%);
+  }
+
+  /* TOAST */
+  .toast {
+    background: var(--green-dim);
+    border: 1px solid var(--green);
+    padding: 10px 14px;
+    margin-bottom: 20px;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    color: var(--green);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .toast::before {
+    content: '▶';
+    font-size: 8px;
+  }
+
+  /* FORM ELEMENTS */
+  .form-group { margin-bottom: 16px; }
+
+  .form-label {
+    display: block;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+    margin-bottom: 6px;
+  }
+
+  .form-label .required {
+    color: var(--red);
+    margin-left: 4px;
+  }
+
+  textarea, input[type="text"], select {
+    width: 100%;
+    background: var(--bg-input);
+    border: 1px solid var(--border-accent);
+    color: var(--text-primary);
+    font-family: var(--body);
+    font-size: 13px;
+    padding: 10px 12px;
+    outline: none;
+    transition: border-color 0.15s;
+    appearance: none;
+    -webkit-appearance: none;
+  }
+
+  textarea:focus, input[type="text"]:focus, select:focus {
+    border-color: var(--green);
+    box-shadow: 0 0 0 1px rgba(57,211,83,0.15);
+  }
+
+  textarea {
+    min-height: 90px;
+    resize: vertical;
+    line-height: 1.6;
+  }
+
+  select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%236b7280'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    padding-right: 32px;
+    cursor: pointer;
+  }
+
+  select option { background: var(--bg-card); }
+
+  /* AI CLASSIFICATION */
+  .ai-section {
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    padding: 14px 16px;
+    margin-top: 4px;
+    position: relative;
+  }
+
+  .ai-section::before {
+    content: 'AI';
+    position: absolute;
+    top: -8px;
+    left: 12px;
+    background: var(--bg-input);
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.15em;
+    color: var(--amber);
+    padding: 0 6px;
+  }
+
+  .ai-label-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+
+  .ai-label-text {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+  }
+
+  /* SUBMIT BUTTON */
+  .btn-primary {
+    width: 100%;
+    background: var(--green);
+    color: #050c07;
+    border: none;
+    padding: 13px 20px;
+    font-family: var(--condensed);
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin-top: 20px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .btn-primary:hover {
+    background: #4de669;
+    transform: none;
+  }
+
+  .btn-primary:active { transform: scale(0.99); }
+
+  .btn-primary::after {
+    content: '→';
+    font-size: 16px;
+    font-weight: 400;
+  }
+
+  /* SIDEBAR PANELS */
+  .sidebar-panel {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+
+  .sidebar-title {
+    font-family: var(--condensed);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .sidebar-title::before {
+    content: '';
+    width: 12px;
+    height: 1px;
+    background: var(--green);
+    display: inline-block;
+  }
+
+  /* INSTRUCTION STEPS */
+  .step-list { list-style: none; }
+
+  .step-item {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 12px;
+    align-items: flex-start;
+  }
+
+  .step-num {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--green);
+    background: var(--green-dim);
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  .step-text {
+    font-size: 12px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+  }
+
+  /* STATS */
+  .stat-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .stat-box {
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    padding: 10px 12px;
+  }
+
+  .stat-val {
+    font-family: var(--mono);
+    font-size: 22px;
+    color: var(--green);
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+
+  .stat-key {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+  }
+
+  /* TICKER */
+  .ticker {
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    padding: 8px 12px;
+    margin-bottom: 16px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .ticker-inner {
+    display: flex;
+    gap: 40px;
+    animation: ticker 20s linear infinite;
+    white-space: nowrap;
+  }
+
+  .ticker-item {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+  }
+
+  .ticker-item span { color: var(--green); margin-right: 8px; }
+
+  @keyframes ticker {
+    from { transform: translateX(0); }
+    to { transform: translateX(-50%); }
+  }
+
+  /* FOOTER STATUS BAR */
+  .footer-bar {
+    background: var(--bg-panel);
+    border-top: 1px solid var(--border);
+    padding: 8px 24px;
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    position: fixed;
+    bottom: 0;
+    left: 0; right: 0;
+    z-index: 100;
+  }
+
+  .footer-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+  }
+
+  /* FEED ITEMS */
+  .feed-item {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--border);
+    padding: 14px 16px;
+    margin-bottom: 10px;
+    cursor: pointer;
+    transition: border-color 0.15s;
+  }
+
+  .feed-item:hover { border-color: var(--border-accent); border-left-color: var(--green); }
+  .feed-item.urgent { border-left-color: var(--red); }
+  .feed-item.warning { border-left-color: var(--amber); }
+  .feed-item.safe { border-left-color: var(--green); }
+
+  .feed-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+
+  .feed-title {
+    font-family: var(--condensed);
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .feed-badges { display: flex; gap: 6px; align-items: center; }
+
+  .badge {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 7px;
+    border: 1px solid;
+  }
+
+  .badge-urgent { color: var(--red); border-color: var(--red-dim); background: rgba(224,60,60,0.06); }
+  .badge-safe { color: var(--green); border-color: var(--green-dim); background: rgba(57,211,83,0.06); }
+  .badge-amber { color: var(--amber); border-color: var(--amber-dim); background: rgba(232,160,32,0.06); }
+
+  .feed-meta {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px;
+  }
+
+  .meta-row {
+    display: flex;
+    gap: 8px;
+    font-size: 11px;
+  }
+
+  .meta-key {
+    font-family: var(--mono);
+    color: var(--text-dim);
+    text-transform: uppercase;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    min-width: 60px;
+  }
+
+  .meta-val { color: var(--text-secondary); }
+
+  /* QR PANEL */
+  .qr-panel {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    padding: 24px;
+    text-align: center;
+    position: relative;
+  }
+
+  .qr-panel::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--green), transparent);
+  }
+
+  .qr-placeholder {
+    width: 180px;
+    height: 180px;
+    margin: 0 auto 16px;
+    border: 1px solid var(--border-accent);
+    background: var(--bg-input);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .qr-placeholder::before,
+  .qr-placeholder::after {
+    content: '';
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    border-color: var(--green);
+    border-style: solid;
+  }
+
+  .qr-placeholder::before {
+    top: 8px; left: 8px;
+    border-width: 2px 0 0 2px;
+  }
+
+  .qr-placeholder::after {
+    bottom: 8px; right: 8px;
+    border-width: 0 2px 2px 0;
+  }
+
+  .qr-placeholder-text {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+  }
+
+  .qr-meta {
+    text-align: left;
+    margin: 16px 0;
+    border-top: 1px solid var(--border);
+    padding-top: 14px;
+  }
+
+  .qr-meta-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 6px;
+    font-size: 11px;
+  }
+
+  .qr-meta-key {
+    font-family: var(--mono);
+    color: var(--text-dim);
+    text-transform: uppercase;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+  }
+
+  .qr-meta-val {
+    font-family: var(--mono);
+    color: var(--text-secondary);
+    font-size: 10px;
+  }
+
+  .btn-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-top: 16px;
+  }
+
+  .btn-sec {
+    background: var(--bg-input);
+    border: 1px solid var(--border-accent);
+    color: var(--text-secondary);
+    padding: 9px 12px;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .btn-sec:hover {
+    border-color: var(--green);
+    color: var(--green);
+  }
+
+  .btn-full {
+    grid-column: 1 / -1;
+    background: rgba(57,211,83,0.06);
+    border: 1px solid var(--green-dim);
+    color: var(--green);
+    padding: 10px;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .btn-full:hover { background: rgba(57,211,83,0.12); }
+
+  /* SCANNER */
+  .scanner-wrap {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    padding: 24px;
+  }
+
+  .scanner-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+  }
+
+  .scanner-title {
+    font-family: var(--condensed);
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .status-chip {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 4px 10px;
+    border: 1px solid var(--green-dim);
+    color: var(--green);
+    background: rgba(57,211,83,0.06);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .status-chip::before {
+    content: '';
+    width: 5px;
+    height: 5px;
+    background: var(--green);
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+  }
+
+  .camera-frame {
+    width: 100%;
+    aspect-ratio: 4/3;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+    margin-bottom: 16px;
+  }
+
+  .camera-frame video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  /* corner decorations */
+  .cam-corner {
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    border-color: var(--green);
+    border-style: solid;
+    opacity: 0.8;
+  }
+
+  .cam-corner.tl { top: 12px; left: 12px; border-width: 2px 0 0 2px; }
+  .cam-corner.tr { top: 12px; right: 12px; border-width: 2px 2px 0 0; }
+  .cam-corner.bl { bottom: 12px; left: 12px; border-width: 0 0 2px 2px; }
+  .cam-corner.br { bottom: 12px; right: 12px; border-width: 0 2px 2px 0; }
+
+  .scan-line {
+    position: absolute;
+    left: 12px; right: 12px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--green), transparent);
+    animation: scan 2.5s ease-in-out infinite;
+  }
+
+  @keyframes scan {
+    0% { top: 15%; }
+    50% { top: 85%; }
+    100% { top: 15%; }
+  }
+
+  .camera-hint {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    text-align: center;
+  }
+
+  .btn-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 8px;
+    margin-top: 12px;
+    margin-bottom: 6px;
+  }
+
+  .btn-ctrl {
+    padding: 9px;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    border: 1px solid var(--border-accent);
+    background: var(--bg-input);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .btn-ctrl:hover { border-color: var(--green); color: var(--green); }
+  .btn-ctrl.danger { border-color: var(--red-dim); color: var(--red); }
+  .btn-ctrl.active { background: rgba(57,211,83,0.08); border-color: var(--green); color: var(--green); }
+
+  /* TABS CONTENT */
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  /* JSON DATA DISPLAY */
+  .json-block {
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    padding: 12px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--green);
+    line-height: 1.8;
+    overflow-x: auto;
+    white-space: pre;
+    margin-bottom: 12px;
+  }
+
+  /* IMPORT METHODS */
+  .import-method {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .import-method:last-child { border-bottom: none; }
+
+  .import-method-icon {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    border: 1px solid var(--border);
+    padding: 3px 5px;
+    white-space: nowrap;
+    margin-top: 1px;
+  }
+
+  .import-method-info { }
+  .import-method-name {
+    font-family: var(--condensed);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    color: var(--text-primary);
+    margin-bottom: 2px;
+  }
+
+  .import-method-desc {
+    font-size: 11px;
+    color: var(--text-secondary);
+    line-height: 1.4;
+  }
+
+  /* CONFIDENCE BAR */
+  .conf-bar {
+    height: 3px;
+    background: var(--border);
+    margin-top: 6px;
+    overflow: hidden;
+  }
+
+  .conf-fill {
+    height: 100%;
+    background: var(--amber);
+    width: 50%;
+  }
+
+  /* FILTER ROW */
+  .filter-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+
+  .filter-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+    white-space: nowrap;
+  }
+
+  select.filter-select {
+    max-width: 180px;
+    padding: 7px 32px 7px 10px;
+  }
+
+  /* MOBILE RESPONSIVE */
+  @media (max-width: 768px) {
+    .layout { grid-template-columns: 1fr; }
+    .sidebar { border-top: 1px solid var(--border); }
+    .header-sub { display: none; }
+    .stat-grid { grid-template-columns: 1fr 1fr 1fr; }
+    body { padding-bottom: 60px; }
+  }
+
+  body { padding-bottom: 40px; }
+
+  /* DATA EXTRACTION */
+  .base64-field {
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    padding: 10px 12px;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-secondary);
+    overflow-x: auto;
+    white-space: nowrap;
+    margin-bottom: 8px;
+    letter-spacing: 0.02em;
+  }
+
+  /* DIVIDER */
+  .divider {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 20px 0;
+  }
+
+  /* BLINK */
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
+  }
+
+  .cursor {
+    display: inline-block;
+    width: 7px;
+    height: 12px;
+    background: var(--green);
+    margin-left: 2px;
+    animation: blink 1s step-end infinite;
+    vertical-align: middle;
+  }
+</style>
+</head>
+<body>
+
+<!-- TICKER -->
+<div class="ticker">
+  <div class="ticker-inner">
+    <span class="ticker-item"><span>●</span> SYSTEM OFFLINE-READY</span>
+    <span class="ticker-item"><span>●</span> QR PROPAGATION ACTIVE</span>
+    <span class="ticker-item"><span>●</span> NO INTERNET REQUIRED</span>
+    <span class="ticker-item"><span>●</span> DEVICE-TO-DEVICE MESH</span>
+    <span class="ticker-item"><span>●</span> TRUST SCORING ENABLED</span>
+    <span class="ticker-item"><span>●</span> SYSTEM OFFLINE-READY</span>
+    <span class="ticker-item"><span>●</span> QR PROPAGATION ACTIVE</span>
+    <span class="ticker-item"><span>●</span> NO INTERNET REQUIRED</span>
+    <span class="ticker-item"><span>●</span> DEVICE-TO-DEVICE MESH</span>
+    <span class="ticker-item"><span>●</span> TRUST SCORING ENABLED</span>
+  </div>
+</div>
+
+<!-- HEADER -->
+<header class="header">
+  <div class="header-left">
+    <div class="signal-icon"></div>
+    <div class="header-title">Offline<span>Net</span></div>
+    <div class="header-sub">Emergency Communication Network</div>
+  </div>
+  <div class="header-status">
+    <div class="status-pill">
+      <div class="status-dot online"></div>
+      FULLY OFFLINE
+    </div>
+    <div class="status-pill">
+      <div class="status-dot online"></div>
+      DEVICE-TO-DEVICE
+    </div>
+    <div class="status-pill">
+      <div class="status-dot warning"></div>
+      QR PROPAGATION
+    </div>
+  </div>
+</header>
+
+<!-- NAV -->
+<nav class="nav">
+  <button class="nav-tab active" onclick="switchTab('create', this)">
+    <svg class="tab-icon" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="10" height="10" rx="1"/><path d="M7 5v4M5 7h4"/></svg>
+    Create
+  </button>
+  <button class="nav-tab" onclick="switchTab('generate', this)">
+    <svg class="tab-icon" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="4" height="4"/><rect x="8" y="2" width="4" height="4"/><rect x="2" y="8" width="4" height="4"/><rect x="8" y="8" width="4" height="4"/></svg>
+    Generate QR
+  </button>
+  <button class="nav-tab" onclick="switchTab('scan', this)">
+    <svg class="tab-icon" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 5V3a1 1 0 0 1 1-1h2M9 2h2a1 1 0 0 1 1 1v2M12 9v2a1 1 0 0 1-1 1H9M5 12H3a1 1 0 0 1-1-1V9M4 7h6"/></svg>
+    Scan QR
+  </button>
+  <button class="nav-tab" onclick="switchTab('feed', this)">
+    <svg class="tab-icon" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 4h10M2 7h7M2 10h5"/></svg>
+    Feed
+    <span style="font-family:var(--mono);font-size:9px;background:var(--green-dim);color:var(--green);padding:1px 5px;margin-left:2px;">4</span>
+  </button>
+</nav>
+
+<!-- MAIN LAYOUT -->
+<div class="layout">
+  <main class="main">
+
+    <!-- CREATE TAB -->
+    <div class="tab-content active" id="tab-create">
+      <div class="section-label">
+        <span>// Message Compose</span>
+        <span style="font-size:9px; color: var(--text-dim);">FIELD REPORT</span>
+      </div>
+
+      <div class="form-card">
+        <div class="toast">
+          MSG CREATED: 6ea6cd43... — PROCEED TO GENERATE QR TAB
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Message Content <span class="required">*</span></label>
+          <textarea placeholder="Describe the situation. Include: location, severity, resource needs, civilian count..."></textarea>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+          <div class="form-group">
+            <label class="form-label">Message Type <span class="required">*</span></label>
+            <select>
+              <option>Medical</option>
+              <option>Safety</option>
+              <option>Evacuation</option>
+              <option>Resource</option>
+              <option>Hazard</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Sender Role <span class="required">*</span></label>
+            <select>
+              <option>Civilian</option>
+              <option>Aid Worker</option>
+              <option>Military</option>
+              <option>Medic</option>
+              <option>Coordinator</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Grid Location <span class="required">*</span></label>
+          <input type="text" placeholder="e.g., Zone 3 — Building A — Sector 12-N" />
+        </div>
+
+        <div class="form-group" style="margin-bottom: 0;">
+          <label class="form-label">AI Classification</label>
+          <div class="ai-section">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+              <div>
+                <div class="ai-label-text" style="margin-bottom: 6px;">Initial Label</div>
+                <select>
+                  <option>Unverified</option>
+                  <option>Urgent</option>
+                  <option>Confirmed</option>
+                  <option>Resolved</option>
+                </select>
+              </div>
+              <div>
+                <div class="ai-label-text" style="margin-bottom: 6px;">AI Summary</div>
+                <input type="text" placeholder="Brief AI summary (optional)" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <button class="btn-primary">Create & Save Message</button>
+      </div>
+    </div>
+
+    <!-- GENERATE QR TAB -->
+    <div class="tab-content" id="tab-generate">
+      <div class="section-label">
+        <span>// QR Code Generator</span>
+        <span style="font-size:9px; color: var(--green);">VER ~~10</span>
+      </div>
+
+      <div class="qr-panel">
+        <div class="qr-placeholder">
+          <div class="cam-corner tl"></div>
+          <div class="cam-corner tr"></div>
+          <div class="cam-corner bl"></div>
+          <div class="cam-corner br"></div>
+          <div class="qr-placeholder-text">QR GENERATED<div class="cursor"></div></div>
+        </div>
+
+        <div class="qr-meta">
+          <div class="qr-meta-row">
+            <span class="qr-meta-key">MSG ID</span>
+            <span class="qr-meta-val">6ea6cd43-839...</span>
+          </div>
+          <div class="qr-meta-row">
+            <span class="qr-meta-key">Type</span>
+            <span class="qr-meta-val" style="color: var(--green);">SAFETY</span>
+          </div>
+          <div class="qr-meta-row">
+            <span class="qr-meta-key">Content</span>
+            <span class="qr-meta-val">test3</span>
+          </div>
+          <div class="qr-meta-row">
+            <span class="qr-meta-key">Hop Count</span>
+            <span class="qr-meta-val">0</span>
+          </div>
+          <div class="qr-meta-row">
+            <span class="qr-meta-key">Trust Score</span>
+            <span class="qr-meta-val">0</span>
+          </div>
+        </div>
+
+        <div class="btn-grid">
+          <button class="btn-sec">↓ Download QR</button>
+          <button class="btn-sec">⎘ Copy QR</button>
+          <button class="btn-sec">⎘ Copy Data</button>
+          <button class="btn-sec">↓ Save JSON</button>
+          <button class="btn-full">↓ Save Base64</button>
+        </div>
+      </div>
+
+      <hr class="divider" />
+
+      <div class="section-label" style="margin-top: 0;">
+        <span>// QR Data Extraction</span>
+      </div>
+
+      <div class="form-card" style="margin-bottom: 0;">
+        <div class="form-label" style="margin-bottom: 8px;">Base64 Data</div>
+        <div class="base64-field">eyJpZCI6IjZlYTZjZDQzLVl6ZDRqZkxTZzBUa3ROR0kxTUMxaE5ETmtMVEIxTkdJMlp...</div>
+        <button class="btn-sec" style="width: 100%; margin-bottom: 16px;">⎘ Copy Base64 Data</button>
+
+        <div class="form-label" style="margin-bottom: 8px;">Full Message JSON</div>
+        <div class="json-block">{ "id": "6ea6cd43-8399-4b50-a43d-0e4b6f95be11",
+  "content": "test3",
+  "type": "safety",
+  "author": "...",
+  "hopCount": 0,
+  "trustScore": 0,
+  "timestamp": "2026-03-27T..."
+}</div>
+        <button class="btn-sec" style="width: 100%; background: rgba(57,211,83,0.05); border-color: var(--green-dim); color: var(--green);">⎘ Copy JSON</button>
+      </div>
+    </div>
+
+    <!-- SCAN QR TAB -->
+    <div class="tab-content" id="tab-scan">
+      <div class="section-label">
+        <span>// QR Code Scanner</span>
+      </div>
+
+      <div class="scanner-wrap">
+        <div class="scanner-header">
+          <div class="scanner-title">Camera Ingestion</div>
+          <div class="status-chip">READY</div>
+        </div>
+
+        <div class="camera-frame">
+          <div class="cam-corner tl"></div>
+          <div class="cam-corner tr"></div>
+          <div class="cam-corner bl"></div>
+          <div class="cam-corner br"></div>
+          <div class="scan-line"></div>
+          <div style="font-family: var(--mono); font-size: 10px; letter-spacing: 0.15em; color: var(--text-dim); text-transform: uppercase; text-align: center; padding: 20px;">
+            CAMERA FEED<br/>
+            <span style="font-size: 8px; color: var(--text-dim); margin-top: 8px; display: block;">AWAITING DEVICE PERMISSION</span>
+          </div>
+        </div>
+
+        <div class="btn-row">
+          <button class="btn-ctrl danger">⏸ Pause</button>
+          <button class="btn-ctrl">↺ Restart</button>
+          <button class="btn-ctrl active">⌨ Manual Input</button>
+        </div>
+
+        <div class="camera-hint">Point camera at QR code — F12 for scan logs</div>
+      </div>
+    </div>
+
+    <!-- FEED TAB -->
+    <div class="tab-content" id="tab-feed">
+      <div class="section-label">
+        <span>// Message Feed <span style="color: var(--green);">(4)</span></span>
+      </div>
+
+      <div class="filter-row">
+        <span class="filter-label">Filter</span>
+        <select class="filter-select">
+          <option>All Types</option>
+          <option>Medical</option>
+          <option>Safety</option>
+          <option>Evacuation</option>
+          <option>Urgent</option>
+        </select>
+      </div>
+
+      <!-- Feed Item 1 -->
+      <div class="feed-item urgent">
+        <div class="feed-header">
+          <div class="feed-title">test2</div>
+          <div class="feed-badges">
+            <div class="badge badge-urgent">URGENT</div>
+            <span style="font-family: var(--mono); font-size: 9px; color: var(--text-dim);">hop 1 / trust 0</span>
+          </div>
+        </div>
+        <div class="feed-meta">
+          <div class="meta-row"><span class="meta-key">ID</span><span class="meta-val">9697f104-b845...</span></div>
+          <div class="meta-row"><span class="meta-key">Type</span><span class="meta-val" style="color: var(--green);">SAFETY</span></div>
+          <div class="meta-row"><span class="meta-key">Role</span><span class="meta-val">aid_worker</span></div>
+          <div class="meta-row"><span class="meta-key">Time</span><span class="meta-val">19:19:02 · 27m ago</span></div>
+          <div class="meta-row" style="grid-column: 1/-1;"><span class="meta-key">Loc</span><span class="meta-val">Bangalore, Karnataka, India</span></div>
+        </div>
+        <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border);">
+          <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 8px;">test2</div>
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <span style="font-family:var(--mono); font-size:9px; color: var(--text-dim);">AI CONF</span>
+            <div class="conf-bar" style="flex: 1;"><div class="conf-fill"></div></div>
+            <span style="font-family:var(--mono); font-size:9px; color: var(--amber);">50.0%</span>
+            <span style="font-family:var(--mono); font-size:9px; color: var(--text-dim);">· local</span>
+          </div>
+        </div>
+        <div style="margin-top: 10px;">
+          <button class="btn-sec" style="border-color: var(--red-dim); color: var(--red); font-size: 9px; padding: 5px 10px;">✕ Delete</button>
+        </div>
+      </div>
+
+      <!-- Feed Item 2 -->
+      <div class="feed-item safe">
+        <div class="feed-header">
+          <div class="feed-title">Test1</div>
+          <div class="feed-badges">
+            <div class="badge badge-safe">SAFE</div>
+            <span style="font-family: var(--mono); font-size: 9px; color: var(--text-dim);">hop 1 / trust 0</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Feed Item 3 -->
+      <div class="feed-item">
+        <div class="feed-header">
+          <div class="feed-title">heyyyyy</div>
+          <div class="feed-badges">
+            <span style="font-family: var(--mono); font-size: 9px; color: var(--text-dim);">hop 0 / trust 0</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+
+    <!-- STATS -->
+    <div class="section-label">// Node Stats</div>
+    <div class="stat-grid" style="margin-bottom: 20px;">
+      <div class="stat-box">
+        <div class="stat-val">4</div>
+        <div class="stat-key">Reports</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-val" style="color: var(--red);">2</div>
+        <div class="stat-key">Urgent</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-val" style="color: var(--amber);">1.2</div>
+        <div class="stat-key">Avg Hops</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-val">0</div>
+        <div class="stat-key">Trust Avg</div>
+      </div>
+    </div>
+
+    <!-- INSTRUCTIONS -->
+    <div class="section-label">// How to Use</div>
+    <div class="sidebar-panel">
+      <ul class="step-list">
+        <li class="step-item">
+          <span class="step-num">01</span>
+          <span class="step-text">Fill in message details and submit</span>
+        </li>
+        <li class="step-item">
+          <span class="step-num">02</span>
+          <span class="step-text">Go to Generate QR tab — download the code</span>
+        </li>
+        <li class="step-item">
+          <span class="step-num">03</span>
+          <span class="step-text">Another device scans it — data merges locally</span>
+        </li>
+        <li class="step-item">
+          <span class="step-num">04</span>
+          <span class="step-text">Feed and analytics update on all devices</span>
+        </li>
+      </ul>
+    </div>
+
+    <!-- IMPORT METHODS (visible in scan tab context) -->
+    <div class="section-label">// Import Methods</div>
+    <div class="sidebar-panel">
+      <div class="import-method">
+        <span class="import-method-icon">CAM</span>
+        <div class="import-method-info">
+          <div class="import-method-name">Camera</div>
+          <div class="import-method-desc">Point at QR code</div>
+        </div>
+      </div>
+      <div class="import-method">
+        <span class="import-method-icon">B64</span>
+        <div class="import-method-info">
+          <div class="import-method-name">Manual Input</div>
+          <div class="import-method-desc">Paste Base64 data directly</div>
+        </div>
+      </div>
+      <div class="import-method">
+        <span class="import-method-icon">FILE</span>
+        <div class="import-method-info">
+          <div class="import-method-name">File Upload</div>
+          <div class="import-method-desc">Upload .json or .txt files</div>
+        </div>
+      </div>
+      <div class="import-method">
+        <span class="import-method-icon">DBG</span>
+        <div class="import-method-info">
+          <div class="import-method-name">Debug</div>
+          <div class="import-method-desc">Open F12 console for logs</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SYSTEM STATUS -->
+    <div class="section-label">// System</div>
+    <div class="sidebar-panel">
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span style="font-family: var(--mono); font-size: 10px; color: var(--text-secondary); letter-spacing: 0.1em; text-transform: uppercase;">Internet</span>
+          <span style="font-family: var(--mono); font-size: 10px; color: var(--red);">DISCONNECTED</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span style="font-family: var(--mono); font-size: 10px; color: var(--text-secondary); letter-spacing: 0.1em; text-transform: uppercase;">Local Storage</span>
+          <span style="font-family: var(--mono); font-size: 10px; color: var(--green);">ACTIVE</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span style="font-family: var(--mono); font-size: 10px; color: var(--text-secondary); letter-spacing: 0.1em; text-transform: uppercase;">QR Engine</span>
+          <span style="font-family: var(--mono); font-size: 10px; color: var(--green);">READY</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span style="font-family: var(--mono); font-size: 10px; color: var(--text-secondary); letter-spacing: 0.1em; text-transform: uppercase;">AI Local</span>
+          <span style="font-family: var(--mono); font-size: 10px; color: var(--amber);">LIMITED</span>
+        </div>
+      </div>
+    </div>
+
+  </aside>
+</div>
+
+<!-- FOOTER STATUS BAR -->
+<div class="footer-bar">
+  <div class="footer-item">
+    <div class="status-dot online"></div>
+    FULLY OFFLINE
+  </div>
+  <div class="footer-item">
+    <div class="status-dot online"></div>
+    DEVICE-TO-DEVICE
+  </div>
+  <div class="footer-item">
+    <div class="status-dot warning"></div>
+    QR-BASED PROPAGATION
+  </div>
+  <div style="margin-left: auto; font-family: var(--mono); font-size: 9px; color: var(--text-dim); letter-spacing: 0.1em;">
+    OFFLINENET v1.0 — NO CLOUD DEPENDENCY
+  </div>
+</div>
+
+<script>
+  function switchTab(id, el) {
+    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+    document.getElementById('tab-' + id).classList.add('active');
+    el.classList.add('active');
+  }
+</script>
+
+</body>
+</html>
